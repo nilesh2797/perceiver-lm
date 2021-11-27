@@ -45,11 +45,11 @@ class MultiHeadAttention(nn.Module):
         self.qk_head_dim = qk_out_dim // num_heads
         self.v_head_dim = v_out_dim // num_heads
 
-        self.k = nn.Linear(kv_dim, qk_out_dim)
-        self.q = nn.Linear(q_dim, qk_out_dim)
-        self.v = nn.Linear(kv_dim, v_out_dim)
-        self.projection = nn.Linear(v_out_dim, output_dim)
-        self.dropout = nn.Dropout(dropout)
+        self.k = nn.Linear(kv_dim, qk_out_dim).to('cuda')
+        self.q = nn.Linear(q_dim, qk_out_dim).to('cuda')
+        self.v = nn.Linear(kv_dim, v_out_dim).to('cuda')
+        self.projection = nn.Linear(v_out_dim, output_dim).to('cuda')
+        self.dropout = nn.Dropout(dropout).to('cuda')
         self.scale = self.qk_head_dim ** -0.5
 
     def forward(
@@ -67,7 +67,10 @@ class MultiHeadAttention(nn.Module):
         Returns:
             Tensor of shape (B, N, D)
         """
-        k, q, v = self.k(inputs_kv), self.q(inputs_q), self.v(inputs_kv)
+        k, q, v = self.k(inputs_kv).to('cuda'), self.q(inputs_q).to('cuda'), self.v(inputs_kv).to('cuda')
+        k = k.to('cuda')
+        q = q.to('cuda')
+        v = v.to('cuda')
         k = rearrange(k, 'b s (n h) -> b n s h', h=self.qk_head_dim)
         q = rearrange(q, 'b s (n h) -> b n s h', h=self.qk_head_dim)
         v = rearrange(v, 'b s (n h) -> b n s h', h=self.v_head_dim)

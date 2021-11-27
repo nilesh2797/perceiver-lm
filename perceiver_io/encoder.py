@@ -61,7 +61,7 @@ class PerceiverEncoder(nn.Module):
         super().__init__()
         self.num_blocks = num_blocks
 
-        self.latents = nn.Parameter(torch.randn(num_latents, latent_dim))
+        self.latents = nn.Parameter(torch.randn(num_latents, latent_dim).to('cuda'))
         self.cross_attn = CrossAttention(
             kv_dim=input_dim,
             q_dim=latent_dim,
@@ -97,11 +97,11 @@ class PerceiverEncoder(nn.Module):
         """
         batch_size = x.size(0)
         if kv_mask is not None:
-            kv_mask = kv_mask[:, None, None, :]
+            kv_mask = kv_mask[:, None, None, :].to('cuda')
 
         latents = self.cross_attn(
-            inputs_kv=x,
-            inputs_q=self.latents.repeat(batch_size, 1, 1),
+            inputs_kv=x.to('cuda'),
+            inputs_q=self.latents.repeat(batch_size, 1, 1).to('cuda'),
             attention_mask=kv_mask
         )
         for _ in range(self.num_blocks):

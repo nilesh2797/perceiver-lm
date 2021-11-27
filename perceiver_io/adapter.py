@@ -97,10 +97,10 @@ class ImageInputAdapter(InputAdapter):
             raise ValueError(f'Input image shape {tuple(d)} different from required shape {self.image_shape}')
 
         # repeat position encoding along batch dimension
-        x_enc = repeat(self.position_encoding, '... -> b ...', b=b)
+        x_enc = repeat(self.position_encoding, '... -> b ...', b=b).to('cuda')
 
         x = rearrange(x, 'b ... c -> b (...) c')
-        return torch.cat([x, x_enc], dim=-1)
+        return torch.cat([x, x_enc], dim=-1).to('cuda')
 
 
 class TextInputAdapter(InputAdapter):

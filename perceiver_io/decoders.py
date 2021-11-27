@@ -60,11 +60,11 @@ class PerceiverDecoder(BasePerceiverDecoder):
             qk_out_dim=qk_out_dim,
             v_out_dim=v_out_dim,
             use_query_residual=use_query_residual
-        )
+        ).to('cuda')
         if projection_dim is not None:
-            self.projection = nn.Linear(query_dim, projection_dim)
+            self.projection = nn.Linear(query_dim, projection_dim).to('cuda')
         else:
-            self.projection = nn.Identity()
+            self.projection = nn.Identity().to('cuda')
 
     def forward(
         self,
@@ -74,10 +74,10 @@ class PerceiverDecoder(BasePerceiverDecoder):
         q_mask: Optional[torch.Tensor] = None
     ):
         if q_mask is not None:
-            q_mask = q_mask[:, None, None, :].transpose(-2, -1)
+            q_mask = q_mask[:, None, None, :].transpose(-2, -1).to('cuda')
         outputs = self.cross_attention(
-            inputs_kv=latents,
-            inputs_q=query,
+            inputs_kv=latents.to('cuda'),
+            inputs_q=query.to('cuda'),
             attention_mask=q_mask
         )
         return self.projection(outputs)
