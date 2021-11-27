@@ -30,6 +30,10 @@ class PerceiverLM(nn.Module):
         self.query_embedding = nn.Embedding(max_seq_len, embedding_dim).to('cuda')
         self.decoder_token_bias = nn.Parameter(torch.randn(vocab_size).to('cuda'))
         if v_out_dim is None: v_out_dim = latent_dim
+        #input_adapter = ImageInputAdapter(
+         #   image_shape=torch.squeeze(inputs).to('cuda').shape,#image_shape assuming bs = 1 which hasto be for pretrained weights
+          #  num_frequency_bands=256)
+        self.linear0 = nn.Linear(1568,768).to('cuda') #for 8 batch size
         encoder = PerceiverEncoder(
             num_latents=num_latents,
             latent_dim=latent_dim,
@@ -54,7 +58,9 @@ class PerceiverLM(nn.Module):
             widening_factor=cross_attn_widening_factor,
             projection_dim=None
         )
+        self.linear1 = nn.Linear(25152,10).to('cuda') #bs = 8
         self.perceiver = PerceiverIO(encoder, decoder)
+        self.m = nn.Softmax(dim=1).to('cuda')        
 
     def forward(
         self,
@@ -68,7 +74,8 @@ class PerceiverLM(nn.Module):
         Returns:
             Tensor of shape (batch_size, seq_len, vocab_size).
         """
-        #print("after transform size is", inputs.size())
+        #print("after transform size is ", inputs.size())
+        #print("shape input to adapter is ", torch.squeeze(inputs).to('cuda').shape)
         input_adapter = ImageInputAdapter(
             image_shape=torch.squeeze(inputs).to('cuda').shape,#image_shape assuming bs = 1 which hasto be for pretrained weights
             num_frequency_bands=256)#args.num_frequency_bands)
@@ -76,8 +83,9 @@ class PerceiverLM(nn.Module):
         #print("image adapter shape is ",image_adapter.shape)
         seq_len = image_adapter.shape[1]
         fst = torch.squeeze(image_adapter).to('cuda')
-        linear0 = nn.Linear(image_adapter.shape[2],768).to('cuda')
-        token_embeddings = linear0(fst)
+        #linear0 = nn.Linear(image_adapter.shape[2],768).to('cuda')
+        #print("linear0 shape", linear0)
+        token_embeddings = self.linear0(fst)
         #print("token embeddings shape is", token_embeddings.shape)
         positions_ids = torch.arange(seq_len, device='cuda').view(1, -1).to('cuda')
         position_embeddings = self.position_embedding(positions_ids).to('cuda')
@@ -89,14 +97,18 @@ class PerceiverLM(nn.Module):
             input_mask=mask,
             query_mask=mask
         )
-        #print(outputs.shape)
+        #print("output shape is", outputs.shape)
         logits = torch.matmul(outputs, self.token_embedding.weight.T).to('cuda') + self.decoder_token_bias
-        #print(logits.shape)
-        last = logits.reshape(1,image_adapter.shape[1]*logits.shape[2]).to('cuda')
-        #print(last.shape)
-        linear1 = nn.Linear(image_adapter.shape[1]*logits.shape[2],10).to('cuda')
-        output = linear1(last)
+        #print("logits shape is", logits.shape)
+        #last = logits.reshape(1,image_adapter.shape[1]*logits.shape[2]).to('cuda')
+        last = logits.reshape(logits.shape[0],logits.shape[1]*logits.shape[2]).to('cuda')
+        #print("last shape is", last.shape)
+        #linear1 = nn.Linear(image_adapter.shape[1]*logits.shape[2],10).to('cuda')
+        #linear1 = nn.Linear(logits.shape[1]*logits.shape[2],10).to('cuda')
+        #print("linear1 shape ", linear1)
+        output = self.linear1(last)
         #print(output.shape)
-        m = nn.Softmax(dim=1).to('cuda')
-        out = m(output)
+        #m = nn.Softmax(dim=1).to('cuda')
+        #print("softmax is ",self.m)
+        out = self.m(output)
         return out

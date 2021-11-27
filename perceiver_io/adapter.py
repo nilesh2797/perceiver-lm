@@ -75,7 +75,8 @@ class ImageInputAdapter(InputAdapter):
 
         if max_frequencies is None:
             max_frequencies = p.shape[:-1]
-
+        #print("p shape is ",p.shape)
+        #print("p.shape -1 is ", p.shape[:-1])
         frequencies = [torch.linspace(1.0, max_freq / 2.0, self.num_frequency_bands, device=p.device) for max_freq in max_frequencies]
         frequency_grids = []
 
@@ -85,22 +86,32 @@ class ImageInputAdapter(InputAdapter):
             encodings.append(p)
         encodings.extend([torch.sin(math.pi * frequency_grid) for frequency_grid in frequency_grids])
         encodings.extend([torch.cos(math.pi * frequency_grid) for frequency_grid in frequency_grids])
-        return torch.cat(encodings, dim=-1)
+        #print("encoding size is", len(encodings))
+        return torch.cat(encodings,dim=-1)
 
     def _num_position_encoding_channels(self, include_positions: bool = False) -> int:
         return len(self.spatial_shape) * (2 * self.num_frequency_bands + include_positions)
 
     def forward(self, x):
-        b, *d = x.shape
+        b,d1,d2,d3 = x.shape
+        #print("b in adapter forward is", b)
 
-        if tuple(d) != self.image_shape:
-            raise ValueError(f'Input image shape {tuple(d)} different from required shape {self.image_shape}')
+        #if tuple(d) != self.image_shape:
+         #   raise ValueError(f'Input image shape {tuple(d)} different from required shape {self.image_shape}')
 
         # repeat position encoding along batch dimension
         x_enc = repeat(self.position_encoding, '... -> b ...', b=b).to('cuda')
-
+        x_enc = torch.split(x_enc,96,1)
+        x_enc1 = x_enc[0]/b
+        for i in range(b-1):
+         x_enc1 = x_enc1.add(x_enc[i+1]/b)
+        #x_enc = (x_enc[0].add(x_enc[1]).add(x_enc[2]))/3
         x = rearrange(x, 'b ... c -> b (...) c')
-        return torch.cat([x, x_enc], dim=-1).to('cuda')
+        #x = repeat(x, '... -> b ...', b=d2).to('cuda')
+        #x = x.reshape(32,3072,32)
+        #print("x shape is", x.shape)
+        #print("x_enc shape is", x_enc1.shape)
+        return torch.cat([x, x_enc1], dim=-1).to('cuda')
 
 
 class TextInputAdapter(InputAdapter):

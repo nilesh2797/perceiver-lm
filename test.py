@@ -26,7 +26,7 @@ trainset, validset = torch.utils.data.random_split(trainset,
                                                       [int(len(trainset)*0.8),len(trainset)- 
                                                       int(len(trainset)*0.8)])
 dims = (3, 32, 32)
-batch_size = 1
+batch_size = 8
 trainloader = torch.utils.data.DataLoader(trainset, batch_size=batch_size,
                                             shuffle=True, num_workers=2)
 validloader = torch.utils.data.DataLoader(validset, batch_size=batch_size,
@@ -44,6 +44,10 @@ state_dict['decoder_token_bias'] = params['embedding_decoder']['bias']
 state_dict['position_embedding.weight'] = params['trainable_position_encoding']['pos_embs']
 state_dict['query_embedding.weight'] = params['basic_decoder/~/trainable_position_encoding']['pos_embs']
 state_dict[f'{model_enc_base}latents'] = params[f'{params_enc_base}trainable_position_encoding']['pos_embs']
+state_dict['linear0.weight'] = torch.rand(768,1568).to('cuda')
+state_dict['linear0.bias'] = torch.rand(768).to('cuda')
+state_dict['linear1.weight'] = torch.rand(10,25152).to('cuda')
+state_dict['linear1.bias'] = torch.rand(10).to('cuda')
 
 def copy_attention_params(model_base, params_base):
     global state_dict
@@ -87,8 +91,9 @@ criterion = nn.CrossEntropyLoss().to('cuda')
 NUM_EPOCHS = 25
 device = 'cuda'
 def train(epoch):
-    for epoch in range(NUM_EPOCHS):
+    #for epoch in range(NUM_EPOCHS):
         model.train()
+        print("model is ", model)
         correct_images = 0
         total_images = 0
         training_loss = 0
@@ -109,9 +114,10 @@ def train(epoch):
                             'Accuracy: %.3f%% (%d/%d)' % (epoch, batch_index, training_loss/(batch_index+1),
                                                     100.*correct_images/total_images, correct_images, total_images))
             trainLossIteration.append(training_loss/(batch_index+1))
+        return training_loss/(batch_index+1), trainLossIteration
 
 def validate(epoch):
-    for epoch in range(NUM_EPOCHS):
+    #for epoch in range(NUM_EPOCHS):
         model.eval()
         validation_running_loss = 0.0
         total_images = 0
@@ -131,6 +137,7 @@ def validate(epoch):
                                                 100.*correct_images/total_images, correct_images, total_images))
                 valLossIteration.append(validation_running_loss/(batch_index+1))
                 epoch_loss = validation_running_loss / (batch_index+1)
+        return epoch_loss, valLossIteration
 
 def test():
     model.eval()
@@ -152,11 +159,36 @@ def test():
             test_accuracy = 100.*correct_images/total_images
     print("accuracy of test set is",test_accuracy)
 epoch = NUM_EPOCHS
-train(epoch)
-validate(epoch)
+#for epoch in range(NUM_EPOCHS):
+   #     train(epoch)
+  #      print("validation loss -------------")
+ #       validate(epoch)
+#print("test loss -------------")
+#test()
+train_loss, val_loss = [], []
+#learning_rate_per_iteration = []
+#learning_rate_per_epoch = []
+LRlistIteration = []
+train_loss_per_iteration = []
+val_loss_per_iteration = []
+for epoch in range(NUM_EPOCHS):
+  training_epoch_loss, trainLossIteration = train(epoch) 
+  #In 1 epoch 48% accuracy
+  validation_epoch_loss, valLossIteration =validate(epoch)
+  train_loss.append(training_epoch_loss)
+  val_loss.append(validation_epoch_loss)
+  #learning_rate_per_epoch.append(LR)
+  train_loss_per_iteration.extend(trainLossIteration)
+  val_loss_per_iteration.extend(valLossIteration)
+  #learning_rate_per_iteration.extend(LRs)
+  #if warm_restarts == False:
+   # scheduler.step() # take default MultiStepLR
+  #print(f"[INFO]: Current LR [Epoch end]: {scheduler.get_last_lr()}")
+  print(f"Training loss: {training_epoch_loss:.3f}")
+  print(f"Validation loss: {validation_epoch_loss:.3f}")
+  print('-----------------------***---------------------------')
+print("test loss ----------")
 test()
-
-
 #if args.local_rank == 0:
  #       _logger.info('Scheduled epochs: {}'.format(num_epochs))
   #  normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
